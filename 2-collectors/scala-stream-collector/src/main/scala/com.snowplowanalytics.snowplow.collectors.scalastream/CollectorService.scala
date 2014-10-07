@@ -76,7 +76,38 @@ class CollectorService(
                           host,
                           ip.toString,
                           request,
-                          refererURI
+                          refererURI,
+                          false
+                        )._1
+                      )
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      } ~
+      path("r") {
+        optionalCookie("sp") { reqCookie =>
+          optionalHeaderValueByName("User-Agent") { userAgent =>
+            optionalHeaderValueByName("Referer") { refererURI =>
+              headerValueByName("Raw-Request-URI") { rawRequest =>
+                hostName { host =>
+                  clientIP { ip =>
+                    requestInstance{ request =>
+                      complete(
+                        responseHandler.cookie(
+                          Option(Uri(rawRequest).query.toString).filter(
+                            _.trim.nonEmpty
+                          ).getOrElse(null),
+                          reqCookie,
+                          userAgent,
+                          host,
+                          ip.toString,
+                          request,
+                          refererURI,
+                          true
                         )._1
                       )
                     }

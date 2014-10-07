@@ -18,9 +18,11 @@ package scalastream
 // Java
 import java.nio.ByteBuffer
 import java.util.UUID
+import java.net.URI
 
 // Apache Commons
 import org.apache.commons.codec.binary.Base64
+import org.apache.http.client.utils.URLEncodedUtils
 
 // Spray
 import spray.http.{DateTime,HttpRequest,HttpResponse,HttpEntity,HttpCookie}
@@ -59,7 +61,7 @@ class ResponseHandler(config: CollectorConfig, sink: AbstractSink) {
   // Kinisis sink and returns an invisible pixel with a cookie.
   def cookie(queryParams: String, requestCookie: Option[HttpCookie],
       userAgent: Option[String], hostname: String, ip: String,
-      request: HttpRequest, refererUri: Option[String]):
+      request: HttpRequest, refererUri: Option[String], redirect: Boolean):
       (HttpResponse, Array[Byte]) = {
     // Use the same UUID if the request cookie contains `sp`.
     val networkUserId: String =
@@ -107,10 +109,23 @@ class ResponseHandler(config: CollectorConfig, sink: AbstractSink) {
       RawHeader("P3P", s"""policyref="${policyRef}", CP="${CP}""""),
       `Set-Cookie`(responseCookie)
     )
-    val httpResponse = HttpResponse(
-      entity = HttpEntity(`image/gif`, ResponseHandler.pixel)
-    ).withHeaders(headers)
-    (httpResponse, sinkResponse)
+
+    if (redirect) {
+      val url = URLEncodedUtils.parse(URI.create("http://localhost/?" + queryParams), event.encoding) find { e => e.getName == "url" } match {
+        case Some(url) => url.getValue()
+        case _ => "http://free-access.seekeo.com/?sp=bugredirect"
+      }
+  
+        val httpResponse = HttpResponse(
+        status = 303
+        ).withHeaders(headers ::: List(RawHeader("Location", url)))
+      (httpResponse, sinkResponse)
+    } else {
+        val httpResponse = HttpResponse(
+          entity = HttpEntity(`image/gif`, ResponseHandler.pixel)
+        ).withHeaders(headers)
+      (httpResponse, sinkResponse)
+    }
   }
 
   def notFound = HttpResponse(status = 404, entity = "404 Not found")
